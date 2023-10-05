@@ -91,135 +91,18 @@ jobs:
 
       - name: Tag Docker images appropriately
         run: >
-          docker tag ghcr.io/ecadlabs/signatory:${{ github.sha }}-amd64 ghcr.io/ecadlabs/signatory:${{ steps.replaceslash.outputs.value }}-amd64;
-          docker tag ghcr.io/ecadlabs/signatory:${{ github.sha }}-arm64 ghcr.io/ecadlabs/signatory:${{ steps.replaceslash.outputs.value }}-arm64;
-          docker tag ghcr.io/ecadlabs/signatory:${{ github.sha }}-armv7 ghcr.io/ecadlabs/signatory:${{ steps.replaceslash.outputs.value }}-armv7;
+          docker tag ghcr.io/denisandreenko/signatory:${{ github.sha }}-amd64 ghcr.io/denisandreenko/signatory:${{ steps.replaceslash.outputs.value }}-amd64;
+          docker tag ghcr.io/denisandreenko/signatory:${{ github.sha }}-arm64 ghcr.io/denisandreenko/signatory:${{ steps.replaceslash.outputs.value }}-arm64;
+          docker tag ghcr.io/denisandreenko/signatory:${{ github.sha }}-armv7 ghcr.io/denisandreenko/signatory:${{ steps.replaceslash.outputs.value }}-armv7;
         if: "!startsWith(github.ref, 'refs/tags/v')"
 
       - name: Push Signatory preview images to GH Container Registry
         run: >
-         docker push ghcr.io/ecadlabs/signatory:${{ steps.replaceslash.outputs.value }}-amd64;
-         docker push ghcr.io/ecadlabs/signatory:${{ steps.replaceslash.outputs.value }}-arm64;
-         docker push ghcr.io/ecadlabs/signatory:${{ steps.replaceslash.outputs.value }}-armv7;
+         docker push ghcr.io/denisandreenko/signatory:${{ steps.replaceslash.outputs.value }}-amd64;
+         docker push ghcr.io/denisandreenko/signatory:${{ steps.replaceslash.outputs.value }}-arm64;
+         docker push ghcr.io/denisandreenko/signatory:${{ steps.replaceslash.outputs.value }}-armv7;
         if: "!startsWith(github.ref, 'refs/tags/v')"
 
       - name: goreleaser release
         run: make release
         if: startsWith(github.ref, 'refs/tags/v')
-
-  integration-tests:
-    if: "!startsWith(github.ref, 'refs/tags/v')"
-    needs: publish
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        testenvs:
-          - current
-          - next
-    steps:
-      - uses: actions/checkout@v3
-      - name: Login to DockerHub
-        uses: docker/login-action@v2
-        if: "!startsWith(github.ref, 'refs/tags/v')"
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: remove slash from image tag
-        uses: mad9000/actions-find-and-replace-string@3
-        id: replaceslash
-        with:
-          source: ${{ github.head_ref || github.ref_name }}
-          find: '/'
-          replace: '-'
-        if: "!startsWith(github.ref, 'refs/tags/v')"
-      - name: Run tests
-        env:
-          IMAGE: ghcr.io/ecadlabs/signatory:${{ steps.replaceslash.outputs.value }}-amd64
-          VAULT_AWS_USER: ${{ secrets.INTEGRATIONTEST_VAULT_AWS_USER }}
-          VAULT_AWS_KEY: ${{ secrets.INTEGRATIONTEST_VAULT_AWS_KEY }}
-          VAULT_AWS_SECRET: ${{ secrets.INTEGRATIONTEST_VAULT_AWS_SECRET }}
-          VAULT_AWS_REGION: ${{ secrets.INTEGRATIONTEST_VAULT_AWS_REGION }}
-          VAULT_AWS_TZ2: ${{ secrets.INTEGRATIONTEST_VAULT_AWS_TZ2 }}
-          VAULT_AWS_TZ3: ${{ secrets.INTEGRATIONTEST_VAULT_AWS_TZ3 }}
-          VAULT_AWS_TZ3_PK: ${{ secrets.INTEGRATIONTEST_VAULT_AWS_TZ3_PK }}
-          VAULT_AZ_CLIENTCERTTHUMB: ${{ secrets.INTEGRATIONTEST_VAULT_AZ_CLIENTCERTTHUMB }}
-          VAULT_AZ_CLIENTID: ${{ secrets.INTEGRATIONTEST_VAULT_AZ_CLIENTID }}
-          VAULT_AZ_RESGROUP: ${{ secrets.INTEGRATIONTEST_VAULT_AZ_RESGROUP }}
-          VAULT_AZ_SP_KEY: ${{ secrets.INTEGRATIONTEST_VAULT_AZ_SP_KEY }}
-          VAULT_AZ_SUBID: ${{ secrets.INTEGRATIONTEST_VAULT_AZ_SUBID }}
-          VAULT_AZ_TENANTID: ${{ secrets.INTEGRATIONTEST_VAULT_AZ_TENANTID }}
-          VAULT_AZ_VAULT: ${{ secrets.INTEGRATIONTEST_VAULT_AZ_VAULT }}
-          VAULT_AZ_TZ2: ${{ secrets.INTEGRATIONTEST_VAULT_AZ_TZ2 }}
-          VAULT_AZ_TZ3: ${{ secrets.INTEGRATIONTEST_VAULT_AZ_TZ3 }}
-          VAULT_AZ_TZ3_PK: ${{ secrets.INTEGRATIONTEST_VAULT_AZ_TZ3_PK }}
-          VAULT_GCP_PROJECTID: ${{ secrets.INTEGRATIONTEST_VAULT_GCP_PROJECTID }}
-          VAULT_GCP_PRIVATEKEYID: ${{ secrets.INTEGRATIONTEST_VAULT_GCP_PRIVATEKEYID }}
-          VAULT_GCP_PRIVATEKEY: ${{ secrets.INTEGRATIONTEST_VAULT_GCP_PRIVATEKEY }}
-          VAULT_GCP_CLIENTEMAIL: ${{ secrets.INTEGRATIONTEST_VAULT_GCP_CLIENTEMAIL }}
-          VAULT_GCP_CLIENTID: ${{ secrets.INTEGRATIONTEST_VAULT_GCP_CLIENTID }}
-          VAULT_GCP_X509_URL: ${{ secrets.INTEGRATIONTEST_VAULT_GCP_X509_URL }}
-          VAULT_GCP_KEYRING: ${{ secrets.INTEGRATIONTEST_VAULT_GCP_KEYRING }}
-          VAULT_GCP_LOCATION: ${{ secrets.INTEGRATIONTEST_VAULT_GCP_LOCATION }}
-          VAULT_GCP_TZ3: ${{ secrets.INTEGRATIONTEST_VAULT_GCP_TZ3 }}
-          VAULT_GCP_TZ3_PK: ${{ secrets.INTEGRATIONTEST_VAULT_GCP_TZ3_PK }}
-        run: >
-         cd integration_test;
-         export ARCH=amd64;
-         . ./.env.${{ matrix.testenvs }};
-         envsubst < gcp-token-template.json > gcp-token.json;
-         echo $VAULT_AZ_SP_KEY |base64 -d >service-principal.key;
-         docker compose up -d --wait --pull always;
-         docker exec octez sudo chown -R tezos /home/tezos/.tezos-client;
-         go test ./...;
-         docker compose kill;
-         rm -f gcp-token.json;
-         rm -f service-principal.key;
-      - uses: actions/upload-artifact@v3
-        with:
-          name: integration-test-coverage-env${{ matrix.testenvs }}
-          path: ./integration_test/coverage/
-
-  report-coverage:
-    needs: integration-tests
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
-        with:
-          go-version: "${{ env.GO_VERSION }}"
-      - name: Setup Code Climate test-reporter
-        run: |
-          curl -L "$CC_BINARY_URL" > ./cc-test-reporter
-          chmod +x ./cc-test-reporter
-      - uses: actions/download-artifact@v3
-        with:
-          name: unit-test-coverage
-          path: unit-test-coverage
-      - uses: actions/download-artifact@v3
-        with:
-          name: integration-test-coverage-envcurrent
-          path: integration-test-coverage-envcurrent
-      - uses: actions/download-artifact@v3
-        with:
-          name: integration-test-coverage-envnext
-          path: integration-test-coverage-envnext
-      - name: Report Coverage
-        run: |
-         export CC_TEST_REPORTER_ID='${{ secrets.CC_TEST_REPORTER_ID }}'
-         if [[ ! -z "$CC_TEST_REPORTER_ID" ]]; then
-          echo "Generating coverage report..."
-          export GIT_COMMIT_SHA='${{ github.sha }}'
-          export GIT_BRANCH="$(echo '${{ github.ref }}' | sed -E -e 's/.*\/(.*)/\1/')"          
-          ./cc-test-reporter before-build
-          go tool covdata textfmt -i=./unit-test-coverage,./integration-test-coverage-envcurrent,./integration-test-coverage-envnext -o ./c.out
-          rm -rf ./unit-test-coverage
-          rm -rf ./integration-test-coverage-envcurrent
-          rm -rf ./integration-test-coverage-envnext
-          sed -i 's/\/go\/src\/github.com/github.com/g' ./c.out
-          mod="$(cat go.mod | awk '/^module/ {print $2}')"
-          ./cc-test-reporter after-build -p "${mod}/" -t gocov
-         fi

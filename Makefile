@@ -16,7 +16,7 @@ signatory-cli:
 
 .PHONY: container
 container: signatory signatory-cli
-	docker build -t ecadlabs/signatory:$(CONTAINER_TAG) .
+	docker build -t denisandreenko/signatory:$(CONTAINER_TAG) .
 
 clean:
 	rm signatory signatory-cli
